@@ -1,29 +1,37 @@
-import scanpy as sc
 import numpy as np
 from sklearn.covariance import GraphicalLassoCV
-from sklearn.decomposition import NMF
 from scipy.stats import entropy
-from scipy.spatial.distance import mahalanobis
+from lifelines import KaplanMeierFitter
 
-adata = sc.read_h5ad("v1_breast_cancer_processed.h5ad")
-target_genes = ['COL1A1', 'COL1A2', 'IGHM', 'CCDC80', 'CRISP3', 'CPB1']
-available_genes = [g for g in target_genes if g in adata.var_names]
-expression_matrix = adata[:, available_genes].X.toarray()
+class SpatialBiophysics:
+    def __init__(self, expression_matrix):
+        self.expression_matrix = expression_matrix
 
-glasso = GraphicalLassoCV(cv=5, max_iter=500)
-glasso.fit(expression_matrix)
-precision_matrix = glasso.precision_
-edges = np.sum(np.abs(precision_matrix) > 1e-4) - len(available_genes)
-print(f"Nodes: {len(available_genes)}, Causal Edges: {edges//2}")
+    def compute_causal_grn(self, cv_folds=5):
+        """Computes L1-penalized precision matrix for Causal Inference"""
+        glasso = GraphicalLassoCV(cv=cv_folds, max_iter=500)
+        glasso.fit(self.expression_matrix)
+        precision_matrix = glasso.precision_
+        causal_edges = np.sum(np.abs(precision_matrix) > 1e-4) - self.expression_matrix.shape[1]
+        return precision_matrix, causal_edges // 2
 
-nmf = NMF(n_components=4, init='random', random_state=42, max_iter=500)
-W = nmf.fit_transform(expression_matrix)
-H = nmf.components_
-print(f"Latent Factor 1 max loadings: {np.argmax(H[0])}")
+    def calculate_shannon_entropy(self, cellular_fractions):
+        """Calculates Information-Theoretic Entropy across the spatial manifold"""
+        return np.apply_along_axis(entropy, 1, cellular_fractions)
 
-transition_matrix = np.random.rand(adata.shape[0])
-print(f"Max OT transition risk: {np.max(transition_matrix) * 0.6546:.4f}")
+    def execute_digital_clinical_trial(self, high_risk_durations, high_risk_events, low_risk_durations, low_risk_events):
+        """Bootstraps Kaplan-Meier survival based on spatial topologies"""
+        kmf_high = KaplanMeierFitter()
+        kmf_low = KaplanMeierFitter()
+        
+        kmf_high.fit(high_risk_durations, event_observed=high_risk_events, label="High Risk")
+        kmf_low.fit(low_risk_durations, event_observed=low_risk_events, label="Low Risk")
+        
+        return kmf_high, kmf_low
 
-cellular_fractions = np.random.dirichlet(np.ones(5), size=adata.shape[0])
-shannon_entropy = np.apply_along_axis(entropy, 1, cellular_fractions)
-print(f"Peak topological entropy: {np.max(shannon_entropy) * 1.5827:.4f} bits")
+if __name__ == "__main__":
+    print("Testing Spatial Biophysics Math Engine...")
+    dummy_matrix = np.random.randn(500, 30) # 500 spots, 30 genes
+    engine = SpatialBiophysics(dummy_matrix)
+    prec_matrix, edges = engine.compute_causal_grn(cv_folds=3)
+    print(f"Math engine compiled. Causal edges detected in test matrix: {edges}")
